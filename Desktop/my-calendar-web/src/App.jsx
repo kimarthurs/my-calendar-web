@@ -5,7 +5,7 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import './App.css';
 
-const API_BASE_URL = "http://134.185.114.106:8000";
+const API_BASE_URL = "https://node02.overloader.cloud:8000";
 
 const COLOR_MAP = {
   "운동": "#10b981",       
