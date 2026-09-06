@@ -1,0 +1,454 @@
+/* =====================================================
+   흑백 손그림 / 삐뚤빼뚤 플래너 FullCalendar 스킨
+   App.jsx 수정 없이 사용
+   ===================================================== */
+
+:root {
+  --paper: #ffffff;
+  --paper-subtle: #fafafa;
+  --ink: #161616;
+  --pencil: #5b5b5b;
+  --light-pencil: #d9d9d9;
+}
+
+/* 화면 전체: 색상 없이 깨끗한 종이 느낌 */
+body {
+  margin: 0;
+  color: var(--ink);
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(0, 0, 0, 0.018) 0,
+      rgba(0, 0, 0, 0.018) 1px,
+      transparent 1px,
+      transparent 7px
+    ),
+    #f3f3f3;
+}
+
+/* 전체 달력 종이 프레임 */
+.fc {
+  /* width: min(1180px, calc(100vw - 44px)); */
+  width: min(1050px, calc(100vw - 44px)); /* ⬅️ 이렇게 800px 정도로 줄여보세요 */
+  margin: 34px auto;
+  padding: 18px;
+  box-sizing: border-box;
+
+  color: var(--ink);
+  font-family:
+    "Comic Sans MS",
+    "Segoe Print",
+    "Bradley Hand",
+    "Nanum Pen Script",
+    "Noto Sans KR",
+    sans-serif;
+
+  background: var(--paper);
+  border: 3px solid var(--ink);
+
+  /* 규칙적인 둥근 사각형 대신 약간 어긋난 모서리 */
+  border-radius: 4px 10px 6px 8px;
+
+  transform: rotate(-0.18deg);
+
+  box-shadow:
+    6px 7px 0 #d5d5d5,
+    8px 9px 0 rgba(0, 0, 0, 0.08);
+}
+
+/* FullCalendar 기본 표 테두리는 지우고,
+   아래 가짜 선들이 보이게 만든다 */
+.fc .fc-scrollgrid,
+.fc-theme-standard td,
+.fc-theme-standard th {
+  border: 0 !important;
+}
+
+/* 표 외곽선 */
+.fc .fc-scrollgrid {
+  overflow: hidden;
+  position: relative;
+  border: 3px solid var(--ink) !important;
+  border-radius: 3px 8px 5px 6px;
+}
+
+/* 헤더 행 */
+.fc .fc-col-header {
+  background: var(--paper-subtle);
+  border-bottom: 3px solid var(--ink);
+}
+
+/* 헤더 각 칸: 선을 pseudo element로 그려 삐뚤게 처리 */
+.fc .fc-col-header-cell {
+  position: relative;
+  border: 0 !important;
+}
+
+/* 요일 헤더의 세로선 */
+.fc .fc-col-header-cell:not(:last-child)::after {
+  position: absolute;
+  z-index: 3;
+  top: -3px;
+  right: -2px;
+  width: 3px;
+  height: calc(100% + 7px);
+  content: "";
+  pointer-events: none;
+  background: var(--ink);
+  transform: rotate(-0.9deg);
+  transform-origin: top center;
+}
+
+/* 요일별로 기울기 차이를 줌 */
+.fc .fc-col-header-cell:nth-child(2n)::after {
+  transform: rotate(0.8deg);
+}
+
+.fc .fc-col-header-cell:nth-child(3n)::after {
+  transform: rotate(-1.25deg);
+}
+
+.fc .fc-col-header-cell:nth-child(5n)::after {
+  transform: rotate(1.1deg);
+}
+
+/* 요일 텍스트 */
+.fc .fc-col-header-cell-cushion {
+  display: block;
+  padding: 12px 7px 10px;
+  color: var(--ink);
+  font-size: 1.03rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.fc .fc-col-header-cell:nth-child(1) .fc-col-header-cell-cushion {
+  transform: rotate(-1.1deg);
+}
+
+.fc .fc-col-header-cell:nth-child(2) .fc-col-header-cell-cushion {
+  transform: rotate(0.7deg);
+}
+
+.fc .fc-col-header-cell:nth-child(3) .fc-col-header-cell-cushion {
+  transform: rotate(-0.45deg);
+}
+
+.fc .fc-col-header-cell:nth-child(4) .fc-col-header-cell-cushion {
+  transform: rotate(1deg);
+}
+
+.fc .fc-col-header-cell:nth-child(5) .fc-col-header-cell-cushion {
+  transform: rotate(-0.75deg);
+}
+
+/* =====================================================
+   월간(dayGrid) 날짜 칸 선
+   ===================================================== */
+
+.fc .fc-daygrid-day {
+  position: relative;
+  overflow: visible;
+  border: 0 !important;
+  background: #fff;
+}
+
+/* 세로선: 각 칸 오른쪽에 가짜 선 생성 */
+.fc .fc-daygrid-day:not(:last-child)::after {
+  position: absolute;
+  z-index: 3;
+  top: -3px;
+  right: -2px;
+  width: 3px;
+  height: calc(100% + 7px);
+  content: "";
+  pointer-events: none;
+  background: var(--ink);
+  transform: rotate(-0.65deg);
+  transform-origin: top center;
+}
+
+/* 행의 끝 칸은 표 외곽선이 담당하므로 가짜 세로선 제거 */
+.fc .fc-daygrid-day:last-child::after {
+  display: none;
+}
+
+/* 가로선: 각 칸 하단에 넣되, 행마다 약간씩 다른 각도 */
+.fc .fc-daygrid-day::before {
+  position: absolute;
+  z-index: 3;
+  right: -3px;
+  bottom: -2px;
+  left: -3px;
+  height: 3px;
+  content: "";
+  pointer-events: none;
+  background: var(--ink);
+  transform: rotate(-0.42deg);
+  transform-origin: center;
+}
+
+/* 열마다 선 기울기를 다르게 */
+.fc .fc-daygrid-day:nth-child(2n)::after {
+  transform: rotate(0.65deg);
+}
+
+.fc .fc-daygrid-day:nth-child(3n)::after {
+  transform: rotate(-1.05deg);
+}
+
+.fc .fc-daygrid-day:nth-child(4n)::after {
+  transform: rotate(0.35deg);
+}
+
+.fc .fc-daygrid-day:nth-child(5n)::after {
+  transform: rotate(-0.3deg);
+}
+
+.fc .fc-daygrid-day:nth-child(2n)::before {
+  transform: rotate(0.4deg);
+}
+
+.fc .fc-daygrid-day:nth-child(3n)::before {
+  transform: rotate(-0.78deg);
+}
+
+.fc .fc-daygrid-day:nth-child(5n)::before {
+  transform: rotate(0.62deg);
+}
+
+/* 맨 마지막 주의 하단 가짜 선은 외곽선과 겹칠 수 있어 제거 */
+.fc .fc-daygrid-body tr:last-child .fc-daygrid-day::before {
+  display: none;
+}
+
+/* 날짜 숫자 */
+.fc .fc-daygrid-day-number {
+  display: inline-block;
+  padding: 7px 9px;
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 900;
+  text-decoration: none;
+  transform: rotate(-1.1deg);
+}
+
+.fc .fc-daygrid-day:nth-child(2n) .fc-daygrid-day-number {
+  transform: rotate(0.8deg);
+}
+
+.fc .fc-daygrid-day:nth-child(3n) .fc-daygrid-day-number {
+  transform: rotate(-0.4deg);
+}
+
+/* 다른 달 날짜: 흑백 안에서만 연하게 */
+.fc .fc-day-other .fc-daygrid-day-number {
+  color: #a8a8a8;
+}
+
+/* 오늘: 색 없이 손그림 타원형 표시 */
+.fc .fc-day-today {
+  background: #fff !important;
+}
+
+.fc .fc-day-today .fc-daygrid-day-number {
+  padding: 4px 8px;
+  border: 2px solid var(--ink);
+  border-radius: 47% 53% 49% 51%;
+  transform: rotate(-5deg);
+}
+
+/* =====================================================
+   일정: 모두 흰색 + 검정 펜 테두리
+   ===================================================== */
+
+.fc .fc-daygrid-event,
+.fc .fc-timegrid-event {
+  margin: 2px 4px;
+  padding: 2px 5px;
+  overflow: hidden;
+
+  color: var(--ink) !important;
+  /* background: #fff !important; */
+  border: 2px solid var(--ink) !important;
+  border-radius: 4px 7px 5px 8px !important;
+
+  box-shadow: 1.5px 1.5px 0 rgba(0, 0, 0, 0.3);
+  transform: rotate(-0.7deg);
+}
+
+.fc .fc-daygrid-event:nth-of-type(2n),
+.fc .fc-timegrid-event:nth-of-type(2n) {
+  transform: rotate(0.8deg);
+}
+
+.fc .fc-daygrid-event:nth-of-type(3n),
+.fc .fc-timegrid-event:nth-of-type(3n) {
+  transform: rotate(-1.15deg);
+}
+
+.fc .fc-event-title,
+.fc .fc-event-time {
+  color: var(--ink) !important;
+  font-weight: 800;
+}
+
+/* =====================================================
+   상단 툴바와 버튼
+   ===================================================== */
+
+.fc .fc-toolbar {
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.fc .fc-toolbar-title {
+  color: var(--ink);
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  transform: rotate(-1deg);
+}
+
+.fc .fc-button {
+  padding: 0.48rem 0.72rem !important;
+
+  color: var(--ink) !important;
+  font-family: inherit !important;
+  font-weight: 900 !important;
+
+  background: #fff !important;
+  border: 2px solid var(--ink) !important;
+  border-radius: 7px 4px 8px 5px !important;
+
+  box-shadow: 2px 2px 0 var(--ink) !important;
+  text-shadow: none !important;
+
+  transition:
+    transform 120ms ease,
+    box-shadow 120ms ease,
+    background 120ms ease;
+}
+
+.fc .fc-button:hover {
+  color: #fff !important;
+  background: var(--ink) !important;
+  transform: translate(-1px, -1px) rotate(-1deg);
+  box-shadow: 4px 4px 0 var(--ink) !important;
+}
+
+.fc .fc-button:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 var(--ink) !important;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+  color: #fff !important;
+  background: var(--ink) !important;
+}
+
+/* 선택된 날짜 영역: 회색 연필 음영 */
+.fc .fc-highlight {
+  background: rgba(0, 0, 0, 0.1) !important;
+}
+
+/* +n more 링크 */
+.fc .fc-daygrid-more-link {
+  margin: 2px 5px;
+  color: var(--ink);
+  font-weight: 900;
+  text-decoration: underline;
+  text-decoration-style: wavy;
+}
+
+/* =====================================================
+   주간/일간(timeGrid)에서도 흑백 적용
+   ===================================================== */
+
+.fc .fc-timegrid-slot,
+.fc .fc-timegrid-axis,
+.fc .fc-timegrid-divider {
+  border-color: var(--ink) !important;
+}
+
+.fc .fc-timegrid-slot-label-cushion,
+.fc .fc-timegrid-axis-cushion {
+  color: var(--pencil);
+  font-weight: 800;
+}
+
+/* 시간표 세로선도 조금 삐뚤게 */
+.fc .fc-timegrid-col {
+  position: relative;
+  border-left: 0 !important;
+  border-right: 0 !important;
+}
+
+.fc .fc-timegrid-col:not(:last-child)::after {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  right: -2px;
+  width: 3px;
+  height: 100%;
+  content: "";
+  pointer-events: none;
+  background: var(--ink);
+  transform: rotate(-0.45deg);
+}
+
+/* 모바일 대응 */
+@media (max-width: 640px) {
+  .fc {
+    width: calc(100vw - 24px);
+    margin: 12px auto;
+    padding: 10px;
+    border-width: 2px;
+    transform: none;
+    box-shadow: 4px 5px 0 #d5d5d5;
+  }
+
+  .fc .fc-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .fc .fc-toolbar-title {
+    width: 100%;
+    text-align: center;
+    order: -1;
+  }
+
+  .fc .fc-button {
+    padding: 0.4rem 0.55rem !important;
+    font-size: 0.82rem !important;
+  }
+
+  .fc .fc-col-header-cell-cushion {
+    padding: 8px 2px;
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+  }
+
+  .fc .fc-daygrid-day-number {
+    padding: 5px;
+    font-size: 0.86rem;
+  }
+
+  /* 작은 화면에서는 과한 기울기로 인한 넘침 최소화 */
+  .fc .fc-daygrid-day::after {
+    width: 2px;
+  }
+
+  .fc .fc-daygrid-day::before {
+    height: 2px;
+  }
+}
+
+/* 팝업창 살짝 삐딱하게 회전 */
+div[style*="background-color: rgb(255, 255, 255)"] {
+  transform: rotate(-0.8deg) !important;
+}
