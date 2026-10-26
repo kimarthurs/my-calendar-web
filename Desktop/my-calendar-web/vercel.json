@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/calendar/:path*",
+      "destination": "https://cal-dav.overloader.cloud/api/calendar/:path*"
+    }
+  ]
+}
