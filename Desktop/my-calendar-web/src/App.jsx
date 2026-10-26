@@ -1,277 +1,165 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
-import './App.css';
+import "./App.css";
 
 const API_BASE_URL = "";
+const EMPTY = { calendarId: "", title: "", location: "", allDay: false, start: "", end: "", description: "" };
+const panel = { background: "white", padding: 24, borderRadius: 12, width: 500, maxWidth: "92vw", maxHeight: "90vh", overflowY: "auto", boxSizing: "border-box", color: "#1f2937" };
+const overlay = { position: "fixed", inset: 0, background: "#0006", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9999 };
+const field = { width: "100%", boxSizing: "border-box", padding: 10, marginTop: 5, border: "1px solid #cbd5e1", borderRadius: 6, background: "white", color: "#111827", font: "inherit" };
 
-
-const COLOR_MAP = {
-  "운동": "#10b981",       
-  "중국 공휴일": "#ef4444", 
-  "중요": "#a855f7",       
-  "캘린더": "#3b82f6",     
-  "학교": "#eab308"        
-};
-
-function App() {
-  const [allEvents, setAllEvents] = useState([]); 
-  const [enabledCalendars, setEnabledCalendars] = useState({}); 
-  
-  const [selectedEvent, setSelectedEvent] = useState(null); 
-  
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [addFormData, setAddFormData] = useState({
-    calendarName: "캘린더",
-    title: "",
-    location: "",
-    allDay: false,
-    start: "",
-    end: "",
-    description: ""
-  });
-
-async function handleDatesSet(dateInfo) {
-  try {
-    const params = new URLSearchParams({
-      start: dateInfo.startStr,
-      end: dateInfo.endStr,
-    });
-
-    const response = await fetch(
-      `${API_BASE_URL}/api/calendar/events?${params.toString()}`
-    );
-
-    if (!response.ok) {
-      throw new Error(`서버 응답 에러: ${response.status}`);
-    }
-
-    const data = await response.json();
-    setAllEvents(data);
-
-    setEnabledCalendars((prev) => {
-      const next = { ...prev };
-      let isChanged = false;
-
-      data.forEach((event) => {
-        if (next[event.calendarName] === undefined) {
-          next[event.calendarName] = true;
-          isChanged = true;
-        }
-      });
-
-      return isChanged ? next : prev;
-    });
-  } catch (error) {
-    console.error("일정을 불러오는데 실패했습니다:", error);
+async function api(path, options = {}) {
+  const res = await fetch(`${API_BASE_URL}${path}`, { cache: "no-store", ...options });
+  const text = await res.text();
+  let data;
+  try { data = text ? JSON.parse(text) : null; } catch { throw new Error(`API가 JSON 대신 다른 응답을 보냈습니다 (${res.status}). 배포 설정을 확인하세요.`); }
+  if (!res.ok) {
+    const detail = data?.detail;
+    const err = new Error(typeof detail === "string" ? detail : detail?.message || `요청 실패 (${res.status})`);
+    err.code = detail?.code;
+    throw err;
   }
+  return data;
 }
 
-  const filteredEvents = allEvents.filter(
-    (event) => enabledCalendars[event.calendarName]
-  );
+export default function App() {
+  const [allEvents, setAllEvents] = useState([]);
+  const [calendars, setCalendars] = useState([]);
+  const [enabled, setEnabled] = useState({});
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [form, setForm] = useState(EMPTY);
+  const [showAdd, setShowAdd] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const range = useRef(null);
+  const requestNumber = useRef(0);
 
-  function handleDateSelect(selectInfo) {
-    const startFormat = selectInfo.allDay ? selectInfo.startStr : selectInfo.startStr.slice(0, 16);
-    const endFormat = selectInfo.allDay 
-      ? (selectInfo.endStr || selectInfo.startStr)
-      : (selectInfo.endStr ? selectInfo.endStr.slice(0, 16) : selectInfo.startStr.slice(0, 16));
+  useEffect(() => {
+    let active = true;
+    api("/api/calendar/calendars").then((data) => {
+      if (!active) return;
+      setCalendars(data);
+      setEnabled((prev) => Object.fromEntries(data.map((c) => [c.id, prev[c.id] ?? true])));
+    }).catch((e) => { if (active) setError(e.message); });
+    return () => { active = false; };
+  }, []);
 
-    setAddFormData({
-      calendarName: "캘린더", 
-      title: "",
-      location: "",
-      allDay: selectInfo.allDay,
-      start: startFormat,
-      end: endFormat,
-      description: ""
-    });
-    
-    setIsAddModalOpen(true);
-    selectInfo.view.calendar.unselect();
+  async function refreshEvents() {
+    if (!range.current) return;
+    const number = ++requestNumber.current;
+    const params = new URLSearchParams(range.current);
+    const data = await api(`/api/calendar/events?${params}`);
+    if (number === requestNumber.current) setAllEvents(data);
   }
 
-  function handleAddSubmit() {
-    if (!addFormData.title) {
-      alert("제목을 입력해 주세요!");
-      return;
-    }
+  async function handleDatesSet(info) {
+    range.current = { start: info.startStr, end: info.endStr };
+    try { await refreshEvents(); setError(""); } catch (e) { setError(e.message); }
+  }
 
-    const newEvent = {
-      id: `temp_${Date.now()}`,
-      calendarName: addFormData.calendarName,
-      title: addFormData.title,
-      start: addFormData.start,
-      end: addFormData.end,
-      allDay: addFormData.allDay,
-      backgroundColor: COLOR_MAP[addFormData.calendarName] || "#222222",
-      borderColor: COLOR_MAP[addFormData.calendarName] || "#222222",
-      extendedProps: {
-        location: addFormData.location,
-        description: addFormData.description
+  function handleDateSelect(info) {
+    if (!calendars.length || busy) { info.view.calendar.unselect(); return; }
+    setError(""); setNotice("");
+    setForm({ ...EMPTY, calendarId: calendars[0].id, allDay: info.allDay,
+      start: info.allDay ? info.startStr : info.startStr.slice(0, 16),
+      end: info.allDay ? info.endStr : info.endStr.slice(0, 16) });
+    setShowAdd(true);
+    info.view.calendar.unselect();
+  }
+
+  async function afterWrite(message) {
+    setNotice(message);
+    try { await refreshEvents(); }
+    catch (e) { setError("저장·삭제 작업은 완료됐지만 목록 새로고침에 실패했어요: " + e.message); }
+  }
+
+  async function handleAddSubmit(e) {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await api("/api/calendar/events", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
+      setShowAdd(false);
+      await afterWrite("Radicale에 저장했어요.");
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
+  }
+
+  async function handleDelete() {
+    if (busy || !selectedEvent) return;
+    if (!window.confirm(`"${selectedEvent.title}" 일정을 Radicale에서 삭제할까요?`)) return;
+    setBusy(true); setError(""); setNotice("");
+    const path = `/api/calendar/events/${encodeURIComponent(selectedEvent.id)}`;
+    try {
+      try { await api(path, { method: "DELETE" }); }
+      catch (err) {
+        if (err.code !== "RECURRING_SERIES") throw err;
+        if (!window.confirm("반복 일정입니다. 선택한 하루만이 아니라 이 반복 일정 전체(과거·미래·예외 일정)를 삭제합니다. 계속할까요?")) return;
+        await api(`${path}?series=true`, { method: "DELETE" });
       }
-    };
-
-    setAllEvents([...allEvents, newEvent]);
-    setIsAddModalOpen(false);
-  }
-
-  function handleEventClick(clickInfo) {
-    setSelectedEvent(clickInfo.event);
-  }
-
-  function handleDelete() {
-    const shouldDelete = window.confirm(`"${selectedEvent.title}" 일정을 정말 삭제할까?`);
-    if (shouldDelete) {
-      setAllEvents((currentEvents) =>
-        currentEvents.filter((event) => event.id !== selectedEvent.id)
-      );
       setSelectedEvent(null);
-    }
+      await afterWrite("Radicale에서 삭제했어요.");
+    } catch (err) { setError(err.message); }
+    finally { setBusy(false); }
   }
 
-  // --- 공통 입력칸 스타일 ---
-  const inputStyle = {
-    flex: 1, 
-    padding: "8px", 
-    fontFamily: "inherit", 
-    border: "1px solid #d5d5d5", 
-    borderRadius: "4px", 
-    outline: "none",
-    backgroundColor: "#ffffff", // 강제 흰색 배경
-    color: "#333333"
-  };
+  function change(key, value) { setForm((prev) => ({ ...prev, [key]: value })); }
+  const shownEvents = allEvents.filter((event) => enabled[event.calendarId]);
+  const renderError = error ? <p role="alert" style={{ color: "#b91c1c", whiteSpace: "pre-wrap" }}>{error}</p> : null;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f1f5f9", padding: "32px 16px", boxSizing: "border-box", fontFamily: "'Gaegu', 'Comic Sans MS', 'Nanum Pen Script', sans-serif" }}>
-      <main style={{ maxWidth: "1200px", margin: "0 auto", background: "#ffffff", padding: "28px", borderRadius: "16px", boxShadow: "0 10px 30px rgba(15, 23, 42, 0.08)" }}>
-        <header style={{ marginBottom: "24px" }}>
-          <h1 style={{ margin: 0, color: "#161616", fontSize: "28px" }}>My Calendar</h1>
-          
-          <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", marginTop: "16px", padding: "12px", background: "#f8f9fa", border: "2px solid #161616", borderRadius: "4px 8px 6px 4px", transform: "rotate(0.2deg)" }}>
-            {Object.entries(enabledCalendars).map(([calName, isChecked]) => (
-              <label key={calName} style={{ cursor: "pointer", display: "flex", alignItems: "center", gap: "6px", fontWeight: "bold", color: "#161616" }}>
-                <input type="checkbox" checked={isChecked} onChange={(e) => setEnabledCalendars((prev) => ({ ...prev, [calName]: e.target.checked }))} style={{ width: "16px", height: "16px", accentColor: "#161616", cursor: "pointer" }} />
-                {calName}
-              </label>
-            ))}
-          </div>
-        </header>
-
-        <FullCalendar
-          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-          initialView="dayGridMonth"
-          initialDate="2026-09-01"
-          locale="ko"
-          height="auto"
-          firstDay={1}
-          selectable={true}
-          editable={true}
-          eventStartEditable={true}
-          eventDurationEditable={true}
-          select={handleDateSelect} 
-          eventClick={handleEventClick}
-          events={filteredEvents} 
-          datesSet={handleDatesSet} 
+    <div style={{ minHeight: "100vh", padding: "24px 12px", background: "#f1f5f9", fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' }}>
+      <main style={{ maxWidth: 1200, margin: "0 auto", padding: 24, background: "white", borderRadius: 14, color: "#111827" }}>
+        <h1>My Calendar</h1>
+        {renderError}
+        {notice && <p role="status" style={{ color: "#047857" }}>{notice}</p>}
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginBottom: 20 }}>
+          {calendars.map((c) => <label key={c.id} style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+            <input type="checkbox" checked={!!enabled[c.id]} onChange={(e) => setEnabled((prev) => ({ ...prev, [c.id]: e.target.checked }))} style={{ accentColor: c.color }} />
+            <span style={{ display: "inline-block", width: 12, height: 12, borderRadius: "50%", background: c.color }} />{c.name}
+          </label>)}
+        </div>
+        <FullCalendar plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]} initialView="dayGridMonth" locale="ko" height="auto" firstDay={1}
+          selectable={!busy && calendars.length > 0} editable={false} select={handleDateSelect} eventClick={(info) => { setError(""); setSelectedEvent(info.event); }}
+          events={shownEvents} datesSet={handleDatesSet}
           headerToolbar={{ left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,timeGridDay" }}
-          buttonText={{ today: "오늘", month: "월", week: "주", day: "일" }}
-        />
+          buttonText={{ today: "오늘", month: "월", week: "주", day: "일" }} />
       </main>
 
-      {/* ================================================= */}
-      {/* 1. 커스텀 팝업 (일정 추가용) */}
-      {/* ================================================= */}
-      {isAddModalOpen && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(0, 0, 0, 0.3)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999 }} onClick={() => setIsAddModalOpen(false)}>
-          <div style={{ backgroundColor: "#fff", padding: "20px 24px", border: "3px solid #161616", borderRadius: "4px 10px 6px 8px", boxShadow: "6px 7px 0 #d5d5d5", transform: "rotate(0.5deg)", width: "460px", maxWidth: "90%", display: "flex", flexDirection: "column", gap: "12px", fontSize: "0.85rem", color: "#161616" }} onClick={(e) => e.stopPropagation()}>
-            
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <label style={{ width: "75px", fontWeight: "bold" }}>캘린더 :</label>
-              <select value={addFormData.calendarName} onChange={(e) => setAddFormData({...addFormData, calendarName: e.target.value})} style={inputStyle}>
-                <option value="캘린더">캘린더 (기본)</option>
-                <option value="운동">운동</option>
-                <option value="학교">학교</option>
-                <option value="중요">중요</option>
-                <option value="중국 공휴일">중국 공휴일</option>
-              </select>
-            </div>
+      {showAdd && <div style={overlay} onClick={() => { if (!busy) setShowAdd(false); }}>
+        <form style={panel} onSubmit={handleAddSubmit} onClick={(e) => e.stopPropagation()}>
+          <h2>일정 추가</h2>{renderError}
+          <label>캘린더<select style={field} value={form.calendarId} disabled={busy} onChange={(e) => change("calendarId", e.target.value)}>{calendars.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+          <p><label>제목<input style={field} required maxLength={1000} value={form.title} disabled={busy} onChange={(e) => change("title", e.target.value)} /></label></p>
+          <p><label>위치<input style={field} value={form.location} disabled={busy} onChange={(e) => change("location", e.target.value)} /></label></p>
+          <p><label><input type="checkbox" checked={form.allDay} disabled={busy} onChange={(e) => {
+            const checked = e.target.checked;
+            setForm((prev) => ({ ...prev, allDay: checked, start: checked ? prev.start.slice(0, 10) : `${prev.start.slice(0, 10)}T09:00`, end: checked ? prev.end.slice(0, 10) : `${prev.end.slice(0, 10)}T10:00` }));
+          }} /> 하루 종일</label></p>
+          <p><label>시작<input style={field} type={form.allDay ? "date" : "datetime-local"} required value={form.start} disabled={busy} onChange={(e) => change("start", e.target.value)} /></label></p>
+          <p><label>종료<input style={field} type={form.allDay ? "date" : "datetime-local"} required value={form.end} disabled={busy} onChange={(e) => change("end", e.target.value)} /></label></p>
+          {form.allDay && <small>종료일은 포함하지 않습니다. 하루 일정은 다음 날을 종료일로 지정하세요.</small>}
+          {!form.allDay && <p><small>입력 시간대는 서버 CALENDAR_TIMEZONE 설정 기준입니다.</small></p>}
+          <p><label>내용<textarea style={{ ...field, minHeight: 130 }} value={form.description} disabled={busy} onChange={(e) => change("description", e.target.value)} /></label></p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}><button type="button" disabled={busy} onClick={() => setShowAdd(false)}>취소</button><button type="submit" disabled={busy}>{busy ? "저장 중…" : "저장"}</button></div>
+        </form>
+      </div>}
 
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <label style={{ width: "75px", fontWeight: "bold" }}>제목 :</label>
-              <input type="text" value={addFormData.title} onChange={(e) => setAddFormData({...addFormData, title: e.target.value})} style={inputStyle} />
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <label style={{ width: "75px", fontWeight: "bold" }}>위치 :</label>
-              <input type="text" value={addFormData.location} onChange={(e) => setAddFormData({...addFormData, location: e.target.value})} style={inputStyle} />
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center" }}>
-              {/* 하루종일 폰트 크기 살짝 작게 조정 */}
-              <label style={{ width: "75px", fontWeight: "bold", fontSize: "0.8rem" }}>하루종일 :</label>
-              <input type="checkbox" checked={addFormData.allDay} onChange={(e) => setAddFormData({...addFormData, allDay: e.target.checked})} style={{ width: "16px", height: "16px", accentColor: "#161616", cursor: "pointer" }} />
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <label style={{ width: "75px", fontWeight: "bold" }}>시작 :</label>
-              <input type={addFormData.allDay ? "date" : "datetime-local"} value={addFormData.start} onChange={(e) => setAddFormData({...addFormData, start: e.target.value})} style={inputStyle} />
-            </div>
-
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <label style={{ width: "75px", fontWeight: "bold" }}>종료 :</label>
-              <input type={addFormData.allDay ? "date" : "datetime-local"} value={addFormData.end} onChange={(e) => setAddFormData({...addFormData, end: e.target.value})} style={inputStyle} />
-            </div>
-
-            {/* 내용 라벨을 왼쪽으로 정렬하고 텍스트박스는 깨끗한 흰색(연한 테두리)으로 변경 */}
-            <div style={{ display: "flex", alignItems: "flex-start", marginTop: "4px" }}>
-              <label style={{ width: "75px", fontWeight: "bold", paddingTop: "10px" }}>내용 :</label>
-              <textarea value={addFormData.description} onChange={(e) => setAddFormData({...addFormData, description: e.target.value})} style={{ flex: 1, padding: "12px", fontFamily: "inherit", border: "1px solid #e0e0e0", borderRadius: "6px", backgroundColor: "#ffffff", color: "#333", minHeight: "150px", resize: "vertical", outline: "none", boxSizing: "border-box" }} />
-            </div>
-
-            {/* 버튼 색상 서로 교체 */}
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "16px" }}>
-              <button onClick={handleAddSubmit} style={{ padding: "6px 16px", background: "#161616", color: "#ffffff", border: "2px solid #161616", borderRadius: "7px 4px 8px 5px", cursor: "pointer", fontWeight: "bold" }}>저장</button>
-              <button onClick={() => setIsAddModalOpen(false)} style={{ padding: "6px 16px", background: "#ffffff", color: "#161616", border: "2px solid #161616", borderRadius: "4px 7px 5px 8px", cursor: "pointer", fontWeight: "bold" }}>취소</button>
-            </div>
-
-          </div>
+      {selectedEvent && <div style={overlay} onClick={() => { if (!busy) setSelectedEvent(null); }}>
+        <div style={panel} onClick={(e) => e.stopPropagation()}>
+          <h2>{selectedEvent.title}</h2>{renderError}
+          <p>{selectedEvent.extendedProps.calendarName}</p>
+          {selectedEvent.extendedProps.location && <p>위치: {selectedEvent.extendedProps.location}</p>}
+          <p>시작: {selectedEvent.start?.toLocaleString("ko-KR")}</p>
+          {selectedEvent.end && <p>종료: {selectedEvent.end.toLocaleString("ko-KR")}{selectedEvent.allDay ? " (종료일 미포함)" : ""}</p>}
+          <p style={{ whiteSpace: "pre-wrap", maxHeight: 250, overflowY: "auto" }}>{selectedEvent.extendedProps.description || "상세 내용이 없습니다."}</p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}><button disabled={busy} onClick={handleDelete} style={{ color: "#dc2626" }}>{busy ? "처리 중…" : "삭제"}</button><button disabled={busy} onClick={() => setSelectedEvent(null)}>닫기</button></div>
         </div>
-      )}
-
-      {/* ================================================= */}
-      {/* 2. 커스텀 팝업 (일정 상세 보기용) */}
-      {/* ================================================= */}
-      {selectedEvent && (
-        <div style={{ position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", backgroundColor: "rgba(0, 0, 0, 0.3)", display: "flex", justifyContent: "center", alignItems: "center", zIndex: 9999 }} onClick={() => setSelectedEvent(null)}>
-          <div style={{ backgroundColor: "#fff", padding: "24px", border: "3px solid #161616", borderRadius: "4px 10px 6px 8px", boxShadow: "6px 7px 0 #d5d5d5", transform: "rotate(-0.5deg)", width: "480px", maxWidth: "90%", display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
-              <div style={{ flex: 1, paddingRight: "16px", textAlign: "left" }}>
-                <h2 style={{ margin: "0 0 8px 0", color: "#161616", fontSize: "1.4rem", wordBreak: "keep-all" }}>{selectedEvent.title}</h2>
-                {selectedEvent.extendedProps?.location && (
-                  <p style={{ margin: 0, color: "#5b5b5b", fontSize: "0.95rem", fontWeight: "bold" }}>위치 : {selectedEvent.extendedProps.location}</p>
-                )}
-              </div>
-              <div style={{ color: "#5b5b5b", fontSize: "0.85rem", textAlign: "right", whiteSpace: "nowrap", paddingTop: "4px" }}>
-                <p style={{ margin: "0 0 4px 0" }}>시작: {selectedEvent.start ? selectedEvent.start.toLocaleString('ko-KR', { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true }) : "시간 없음"}</p>
-                {selectedEvent.end && (
-                  <p style={{ margin: 0 }}>종료: {selectedEvent.end.toLocaleString('ko-KR', { year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hour12: true })}</p>
-                )}
-              </div>
-            </div>
-            <div style={{ backgroundColor: "#fafafa", border: "2px solid #d5d5d5", borderRadius: "6px", padding: "16px", minHeight: "120px", maxHeight: "200px", overflowY: "auto", marginBottom: "24px", textAlign: "left", fontSize: "0.95rem", color: "#333", whiteSpace: "pre-wrap" }}>
-              {selectedEvent.extendedProps?.description || "상세 내용이 없습니다."}
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-              <button onClick={handleDelete} style={{ padding: "6px 12px", background: "#fff", color: "#ef4444", border: "2px solid #ef4444", borderRadius: "4px 7px 5px 8px", cursor: "pointer", fontWeight: "bold" }}>삭제</button>
-              <button onClick={() => setSelectedEvent(null)} style={{ padding: "6px 12px", background: "#161616", color: "#fff", border: "2px solid #161616", borderRadius: "7px 4px 8px 5px", cursor: "pointer", fontWeight: "bold" }}>닫기</button>
-            </div>
-          </div>
-        </div>
-      )}
+      </div>}
     </div>
   );
 }
-
-export default App;
