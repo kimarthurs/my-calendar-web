@@ -1,3 +1,4 @@
+
 /* =====================================================
    흑백 손그림 / 삐뚤빼뚤 플래너 FullCalendar 스킨
    App.jsx 수정 없이 사용
@@ -9,6 +10,23 @@
   --ink: #161616;
   --pencil: #5b5b5b;
   --light-pencil: #d9d9d9;
+
+  /* App.jsx 설정창에서 선택한 값으로 변경됨 */
+  --calendar-font: system-ui, -apple-system, sans-serif;
+}
+
+/* 페이지, 제목, 입력창, 버튼, 달력의 글꼴 통일 */
+body,
+#root,
+h1,
+h2,
+h3,
+button,
+input,
+select,
+textarea,
+.fc {
+  font-family: var(--calendar-font);
 }
 
 /* 화면 전체: 색상 없이 깨끗한 종이 느낌 */
@@ -35,13 +53,8 @@ body {
   box-sizing: border-box;
 
   color: var(--ink);
-  font-family:
-    "Comic Sans MS",
-    "Segoe Print",
-    "Bradley Hand",
-    "Nanum Pen Script",
-    "Noto Sans KR",
-    sans-serif;
+  font-family: var(--calendar-font);
+
 
   background: var(--paper);
   border: 3px solid var(--ink);
@@ -403,7 +416,7 @@ body {
 /* 모바일 대응 */
 @media (max-width: 640px) {
   .fc {
-    width: calc(100vw - 24px);
+    width: 100%;
     margin: 12px auto;
     padding: 10px;
     border-width: 2px;
