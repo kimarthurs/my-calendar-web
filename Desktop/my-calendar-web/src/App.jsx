@@ -5,7 +5,8 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import './App.css';
 
-const API_BASE_URL = "https://node02.overloader.cloud:8000";
+const API_BASE_URL = "";
+
 
 const COLOR_MAP = {
   "운동": "#10b981",       
@@ -32,29 +33,41 @@ function App() {
     description: ""
   });
 
-  async function handleDatesSet(dateInfo) {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/calendar/events?start=${dateInfo.startStr}&end=${dateInfo.endStr}`);
-      if (!response.ok) throw new Error("서버 응답 에러");
-      
-      const data = await response.json();
-      setAllEvents(data);
+async function handleDatesSet(dateInfo) {
+  try {
+    const params = new URLSearchParams({
+      start: dateInfo.startStr,
+      end: dateInfo.endStr,
+    });
 
-      setEnabledCalendars((prev) => {
-        const next = { ...prev };
-        let isChanged = false;
-        data.forEach((event) => {
-          if (next[event.calendarName] === undefined) {
-            next[event.calendarName] = true;
-            isChanged = true;
-          }
-        });
-        return isChanged ? next : prev;
-      });
-    } catch (error) {
-      console.error("일정을 불러오는데 실패했습니다:", error);
+    const response = await fetch(
+      `${API_BASE_URL}/api/calendar/events?${params.toString()}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`서버 응답 에러: ${response.status}`);
     }
+
+    const data = await response.json();
+    setAllEvents(data);
+
+    setEnabledCalendars((prev) => {
+      const next = { ...prev };
+      let isChanged = false;
+
+      data.forEach((event) => {
+        if (next[event.calendarName] === undefined) {
+          next[event.calendarName] = true;
+          isChanged = true;
+        }
+      });
+
+      return isChanged ? next : prev;
+    });
+  } catch (error) {
+    console.error("일정을 불러오는데 실패했습니다:", error);
   }
+}
 
   const filteredEvents = allEvents.filter(
     (event) => enabledCalendars[event.calendarName]
